@@ -73,16 +73,14 @@ export class App {
   private setupWebSocket(): void {
     const wsUrl = process.env.NODE_ENV === 'production' ? 'wss://fun-chat-server.onrender.com' : 'ws://localhost:4000';
 
-this.wsClient.connect(wsUrl);
+    this.wsClient.connect(wsUrl);
 
     this.wsClient.onEvent('connected', () => {
-      console.log('Connected to WebSocket server');
-      this.showNotification('Подключено к серверу');
+      console.log('WebSocket: Connected to server');
     });
 
     this.wsClient.onEvent('disconnected', () => {
-      console.log('Disconnected from WebSocket server');
-      this.showNotification('Отключено от сервера. Пытаемся переподключиться...');
+      console.log('WebSocket: Disconnected from server');
     });
 
     this.wsClient.onEvent('error', (error) => {
@@ -90,8 +88,10 @@ this.wsClient.connect(wsUrl);
     });
 
     this.wsClient.onEvent('USER_LOGIN', (data: any) => {
+      console.log('WebSocket: USER_LOGIN received');
       const response = data as { user: User };
       if (response.user.isLogined) {
+        console.log('Login successful, navigating to /main');
         this.stateManager.setCurrentUser(response.user.login);
         this.stateManager.setAuthenticated(true);
         this.requestActiveUsers();
@@ -101,8 +101,6 @@ this.wsClient.connect(wsUrl);
 
     this.wsClient.onEvent('ERROR', (data: any) => {
       const error = data as { error: string };
-      this.showNotification(`Ошибка: ${error.error}`);
-      
       if (this.currentPage === this.authPage.render()) {
         this.authPage.showError(error.error);
       }
@@ -150,15 +148,18 @@ this.wsClient.connect(wsUrl);
   }
 
   private showAuthPage(): void {
+    console.log('Showing auth page');
     this.currentPage = this.authPage.render();
     this.appContainer.innerHTML = '';
     this.appContainer.appendChild(this.currentPage);
   }
 
   private showMainPage(): void {
+    console.log('Showing main page');
     const state = this.stateManager.getState();
-    
+
     if (!this.mainPage) {
+      console.log('Creating new MainPage');
       this.mainPage = new MainPage(
         state.currentUser!,
         () => this.handleLogout(),
@@ -167,23 +168,21 @@ this.wsClient.connect(wsUrl);
         (messageId) => this.deleteMessage(messageId),
         (messageId, newText) => this.editMessage(messageId, newText),
         (messageId) => this.markAsRead(messageId),
-        (userLogin) => this.requestMessages(userLogin)
+        (userLogin) => this.requestMessages(userLogin),
+        this.stateManager
       );
     } else {
+      console.log('Updating existing MainPage');
       this.mainPage.updateUserName(state.currentUser!);
     }
 
     this.currentPage = this.mainPage.render();
     this.appContainer.innerHTML = '';
     this.appContainer.appendChild(this.currentPage);
-
-    this.mainPage.setUsers(state.users);
-    state.unreadCounts.forEach((count, userLogin) => {
-      this.mainPage?.setUnreadCount(userLogin, count);
-    });
   }
 
   private showAboutPage(): void {
+    console.log('Showing about page');
     this.currentPage = this.aboutPage.render();
     this.appContainer.innerHTML = '';
     this.appContainer.appendChild(this.currentPage);
@@ -191,7 +190,7 @@ this.wsClient.connect(wsUrl);
 
   private handleLogin(login: string, password: string): void {
     const requestId = this.generateRequestId();
-    
+
     this.wsClient.onMessage(requestId, (response: ServerResponse) => {
       if (response.type === 'ERROR') {
         this.authPage.showError((response.payload as any).error);
@@ -284,12 +283,11 @@ this.wsClient.connect(wsUrl);
 
   private requestMessages(userLogin: string): void {
     const requestId = this.generateRequestId();
-    
+
     this.wsClient.onMessage(requestId, (response: ServerResponse) => {
       if (response.type === 'MSG_FROM_USER') {
         const messages = (response.payload as any).messages as Message[];
         this.stateManager.setMessages(messages);
-        this.mainPage?.setMessages(messages);
       }
     });
 
@@ -302,12 +300,11 @@ this.wsClient.connect(wsUrl);
     });
 
     const countRequestId = this.generateRequestId();
-    
+
     this.wsClient.onMessage(countRequestId, (response: ServerResponse) => {
       if (response.type === 'MSG_COUNT_NOT_READED_FROM_USER') {
         const count = (response.payload as any).count as number;
         this.stateManager.setUnreadCount(userLogin, count);
-        this.mainPage?.setUnreadCount(userLogin, count);
       }
     });
 
@@ -322,35 +319,14 @@ this.wsClient.connect(wsUrl);
 
   private handleIncomingMessage(message: Message): void {
     this.stateManager.addMessage(message);
-    this.mainPage?.addMessage(message);
-
-    if (message.to === this.stateManager.getState().currentUser) {
-      const userLogin = message.from;
-      const currentCount = this.stateManager.getState().unreadCounts.get(userLogin) || 0;
-      this.stateManager.setUnreadCount(userLogin, currentCount + 1);
-      this.mainPage?.setUnreadCount(userLogin, currentCount + 1);
-    }
   }
 
   private updateUserStatus(userLogin: string, isOnline: boolean): void {
     const state = this.stateManager.getState();
-    const users = state.users.map(user => 
+    const users = state.users.map(user =>
       user.login === userLogin ? { ...user, isLogined: isOnline } : user
     );
     this.stateManager.setUsers(users);
-    this.mainPage?.updateUserStatus(userLogin, isOnline);
-  }
-
-  private showNotification(message: string): void {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      notification.remove();
-    }, 3000);
   }
 
   private generateRequestId(): string {
@@ -358,9 +334,3 @@ this.wsClient.connect(wsUrl);
     return `req_${Date.now()}_${this.messageCounter}`;
   }
 }
-
-
-
-
-
-

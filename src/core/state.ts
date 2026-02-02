@@ -4,9 +4,9 @@ export interface AppState {
   currentUser: string | null;
   isAuthenticated: boolean;
   users: User[];
-  messages: Message[];
-  activeChatUser: string | null;
-  unreadCounts: Map<string, number>;
+  messages: Record<string, Message[]>;
+  userStatuses: Record<string, { isOnline: boolean }>;
+  unreadCounts: Record<string, number>;
 }
 
 export class StateManager {
@@ -14,9 +14,9 @@ export class StateManager {
     currentUser: null,
     isAuthenticated: false,
     users: [],
-    messages: [],
-    activeChatUser: null,
-    unreadCounts: new Map()
+    messages: {},
+    userStatuses: {},
+    unreadCounts: {}
   };
 
   private listeners: Set<(state: AppState) => void> = new Set();
@@ -41,48 +41,68 @@ export class StateManager {
   }
 
   setMessages(messages: Message[]): void {
-    this.state.messages = messages;
+    if (messages.length === 0) return;
+
+    const firstMessage = messages[0];
+    const otherUser = firstMessage.from === this.state.currentUser ? firstMessage.to : firstMessage.from;
+
+    this.state.messages[otherUser] = messages;
     this.notifyListeners();
   }
 
   addMessage(message: Message): void {
-    this.state.messages.push(message);
-    this.notifyListeners();
-  }
+    const otherUser = message.from === this.state.currentUser ? message.to : message.from;
 
-  setActiveChatUser(userLogin: string | null): void {
-    this.state.activeChatUser = userLogin;
+    if (!this.state.messages[otherUser]) {
+      this.state.messages[otherUser] = [];
+    }
+
+    this.state.messages[otherUser].push(message);
     this.notifyListeners();
   }
 
   setUnreadCount(userLogin: string, count: number): void {
-    this.state.unreadCounts.set(userLogin, count);
+    this.state.unreadCounts[userLogin] = count;
+    this.notifyListeners();
+  }
+
+  updateUserStatus(userLogin: string, isOnline: boolean): void {
+    this.state.userStatuses[userLogin] = { isOnline };
     this.notifyListeners();
   }
 
   updateMessageStatus(messageId: string, isDelivered: boolean, isReaded: boolean): void {
-    const message = this.state.messages.find(msg => msg.id === messageId);
-    if (message) {
-      message.status.isDelivered = isDelivered;
-      message.status.isReaded = isReaded;
-      this.notifyListeners();
+    for (const userLogin in this.state.messages) {
+      const message = this.state.messages[userLogin].find(msg => msg.id === messageId);
+      if (message) {
+        message.status.isDelivered = isDelivered;
+        message.status.isReaded = isReaded;
+        this.notifyListeners();
+        break;
+      }
     }
   }
 
   updateMessageText(messageId: string, newText: string): void {
-    const message = this.state.messages.find(msg => msg.id === messageId);
-    if (message) {
-      message.text = newText;
-      message.status.isEdited = true;
-      this.notifyListeners();
+    for (const userLogin in this.state.messages) {
+      const message = this.state.messages[userLogin].find(msg => msg.id === messageId);
+      if (message) {
+        message.text = newText;
+        message.status.isEdited = true;
+        this.notifyListeners();
+        break;
+      }
     }
   }
 
   deleteMessage(messageId: string): void {
-    const message = this.state.messages.find(msg => msg.id === messageId);
-    if (message) {
-      message.status.isDeleted = true;
-      this.notifyListeners();
+    for (const userLogin in this.state.messages) {
+      const messageIndex = this.state.messages[userLogin].findIndex(msg => msg.id === messageId);
+      if (messageIndex !== -1) {
+        this.state.messages[userLogin][messageIndex].status.isDeleted = true;
+        this.notifyListeners();
+        break;
+      }
     }
   }
 
@@ -96,7 +116,11 @@ export class StateManager {
   private notifyListeners(): void {
     const state = this.getState();
     this.listeners.forEach(listener => {
-      listener(state);
+      try {
+        listener(state);
+      } catch (error) {
+        console.error('StateManager listener error:', error);
+      }
     });
   }
 }

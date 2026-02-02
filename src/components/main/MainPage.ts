@@ -3,6 +3,7 @@ import { Footer } from './Footer';
 import { UserList } from './UserList';
 import { ChatDialog } from './ChatDialog';
 import { User, Message } from '../../api/types';
+import { StateManager } from '../../core/state';
 
 export class MainPage {
   private element: HTMLElement;
@@ -11,6 +12,8 @@ export class MainPage {
   private userList: UserList;
   private chatDialog: ChatDialog;
   private selectedUser: string = '';
+  private stateManager: StateManager;
+  private unsubscribe: (() => void) | null = null;
 
   constructor(
     userName: string,
@@ -20,10 +23,13 @@ export class MainPage {
     deleteMessageCallback: (messageId: string) => void,
     editMessageCallback: (messageId: string, newText: string) => void,
     markAsReadCallback: (messageId: string) => void,
-    requestMessagesCallback: (userLogin: string) => void
+    requestMessagesCallback: (userLogin: string) => void,
+    stateManager: StateManager
   ) {
     this.element = document.createElement('div');
     this.element.className = 'main-page';
+
+    this.stateManager = stateManager;
 
     this.header = new Header(userName, logoutCallback, showAboutCallback);
     this.footer = new Footer();
@@ -44,6 +50,36 @@ export class MainPage {
       this.selectedUser = userLogin;
       this.chatDialog.setSelectedUser(userLogin, true);
       requestMessagesCallback(userLogin);
+    });
+
+    this.subscribeToState();
+  }
+
+  private subscribeToState(): void {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
+
+    this.unsubscribe = this.stateManager.subscribe((state) => {
+      if (state.users) {
+        this.setUsers(state.users);
+      }
+
+      if (state.userStatuses) {
+        Object.entries(state.userStatuses).forEach(([userLogin, status]) => {
+          this.updateUserStatus(userLogin, (status as { isOnline: boolean }).isOnline);
+        });
+      }
+
+      if (this.selectedUser && state.messages && state.messages[this.selectedUser]) {
+        this.setMessages(state.messages[this.selectedUser]);
+      }
+
+      if (state.unreadCounts) {
+        Object.entries(state.unreadCounts).forEach(([userLogin, count]) => {
+          this.setUnreadCount(userLogin, count as number);
+        });
+      }
     });
   }
 
@@ -73,6 +109,13 @@ export class MainPage {
     this.element.appendChild(footerElement);
 
     return this.element;
+  }
+
+  destroy(): void {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
   }
 
   updateUserName(newName: string): void {

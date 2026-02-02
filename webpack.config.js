@@ -7,13 +7,15 @@ const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
+  const isGitHubPages = process.env.GITHUB_PAGES === 'true';
+  const repositoryName = 'fun-chat';
 
   return {
     entry: './src/index.ts',
     output: {
       filename: 'bundle.[contenthash].js',
       path: path.resolve(__dirname, 'dist'),
-      publicPath: '/'
+      publicPath: isGitHubPages ? `/${repositoryName}/` : '/'
     },
     devServer: {
       static: [
@@ -65,7 +67,8 @@ module.exports = (env, argv) => {
       }),
       new CopyPlugin({
         patterns: [
-          { from: 'public', to: 'public' }
+          { from: 'public', to: 'public' },
+          { from: '_redirects', to: '.' }
         ]
       })
     ]
