@@ -71,7 +71,9 @@ export class App {
   }
 
   private setupWebSocket(): void {
-    this.wsClient.connect('ws://localhost:4000');
+    const wsUrl = process.env.NODE_ENV === 'production' ? 'wss://fun-chat-server.onrender.com' : 'ws://localhost:4000';
+
+this.wsClient.connect(wsUrl);
 
     this.wsClient.onEvent('connected', () => {
       console.log('Connected to WebSocket server');
@@ -356,6 +358,7 @@ export class App {
     return `req_${Date.now()}_${this.messageCounter}`;
   }
 }
+
 
 
 

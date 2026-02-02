@@ -1,4 +1,5 @@
 ﻿const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
@@ -6,7 +7,7 @@ const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
-  
+
   return {
     entry: './src/index.ts',
     output: {
@@ -15,11 +16,18 @@ module.exports = (env, argv) => {
       publicPath: '/'
     },
     devServer: {
-      static: {
-        directory: path.join(__dirname, 'dist')
-      },
+      static: [
+        {
+          directory: path.join(__dirname, './'),
+          publicPath: '/'
+        },
+        {
+          directory: path.join(__dirname, 'src'),
+          publicPath: '/src'
+        }
+      ],
       compress: true,
-      port: 8080,
+      port: 8082,
       historyApiFallback: true,
       hot: true
     },
@@ -44,6 +52,9 @@ module.exports = (env, argv) => {
       ]
     },
     plugins: [
+      new webpack.DefinePlugin({
+        'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
+      }),
       new CleanWebpackPlugin(),
       new HtmlWebpackPlugin({
         template: './index.html',
