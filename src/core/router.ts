@@ -5,31 +5,41 @@ export class Router {
   private currentRoute: string = '';
 
   constructor() {
-    window.addEventListener('popstate', () => {
+    window.addEventListener('hashchange', () => {
+      this.handleRouteChange();
+    });
+
+    window.addEventListener('load', () => {
       this.handleRouteChange();
     });
   }
 
   addRoute(path: string, handler: RouteHandler): void {
     console.log(`Router: добавлен маршрут ${path}`);
-    this.routes.set(path, handler);
+
+    const normalizedPath = path.startsWith('/') ? path : '/' + path;
+    this.routes.set(normalizedPath, handler);
   }
 
   navigate(path: string): void {
     console.log(`Router: переход на ${path}, текущий маршрут ${this.currentRoute}`);
-    if (path !== this.currentRoute) {
-      window.history.pushState({}, '', path);
-      this.currentRoute = path;
-      this.handleRouteChange();
+
+    const normalizedPath = path.startsWith('/') ? path : '/' + path;
+
+    if (normalizedPath !== this.currentRoute) {
+
+      window.location.hash = normalizedPath;
+      this.currentRoute = normalizedPath;
     } else {
       console.log('Router: уже на этом маршруте, повторный вызов обработчика');
-      const handler = this.routes.get(path);
+      const handler = this.routes.get(normalizedPath);
       if (handler) handler();
     }
   }
 
   getCurrentPath(): string {
-    return window.location.pathname;
+    const hash = window.location.hash.slice(1);
+    return hash || '/login';
   }
 
   start(): void {
@@ -48,12 +58,14 @@ export class Router {
       handler();
     } else {
       console.log(`Router: обработчик для ${path} не найден, пробуем корневой маршрут`);
+
       const defaultHandler = this.routes.get('/');
       if (defaultHandler) {
         console.log('Router: используется корневой обработчик');
         defaultHandler();
       } else {
-        console.error('Router: корневой обработчик не найден');
+        console.error('Router: обработчик не найден, перенаправляем на логин');
+        this.navigate('/login');
       }
     }
   }

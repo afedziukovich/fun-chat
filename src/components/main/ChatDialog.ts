@@ -11,6 +11,31 @@ export class ChatDialog {
   private unreadDividerElement: HTMLElement | null = null;
   private lastReadIndex: number = -1;
 
+  private static readonly CLASS_NAMES = {
+    CHAT_DIALOG: 'chat-dialog',
+    DIALOG_HEADER: 'dialog-header',
+    DIALOG_USER_INFO: 'dialog-user-info',
+    DIALOG_USER_STATUS: 'dialog-user-status',
+    ONLINE: 'online',
+    OFFLINE: 'offline',
+    MESSAGES_CONTAINER: 'messages-container',
+    EMPTY_DIALOG_MESSAGE: 'empty-dialog-message',
+    MESSAGE_INPUT_CONTAINER: 'message-input-container',
+    MESSAGE_INPUT: 'message-input',
+    SEND_BUTTON: 'send-button',
+    UNREAD_DIVIDER: 'unread-divider'
+  } as const;
+
+  private static readonly TEXT = {
+    SELECT_USER: 'Выберите пользователя для отправки сообщения...',
+    START_OF_DIALOG: 'Это начало диалога',
+    YOUR_MESSAGE: 'Ваше сообщение...',
+    SEND: 'Отправить',
+    NEW_MESSAGES: 'Новые сообщения',
+    ONLINE: 'В сети',
+    OFFLINE: 'Не в сети'
+  } as const;
+
   constructor(
     private onSendMessage: (text: string) => void,
     private onDeleteMessage: (messageId: string) => void,
@@ -22,27 +47,26 @@ export class ChatDialog {
 
   render(): HTMLElement {
     this.element.innerHTML = '';
-    this.element.className = 'chat-dialog';
+    this.element.className = ChatDialog.CLASS_NAMES.CHAT_DIALOG;
 
     const dialogHeader = document.createElement('div');
-    dialogHeader.className = 'dialog-header';
+    dialogHeader.className = ChatDialog.CLASS_NAMES.DIALOG_HEADER;
 
     const userInfo = document.createElement('div');
-    userInfo.className = 'dialog-user-info';
-    userInfo.id = 'dialog-user-info';
+    userInfo.className = ChatDialog.CLASS_NAMES.DIALOG_USER_INFO;
+    userInfo.id = ChatDialog.CLASS_NAMES.DIALOG_USER_INFO;
 
     const statusIndicator = document.createElement('span');
-    statusIndicator.className = 'dialog-user-status';
-    statusIndicator.id = 'dialog-user-status';
+    statusIndicator.className = ChatDialog.CLASS_NAMES.DIALOG_USER_STATUS;
+    statusIndicator.id = ChatDialog.CLASS_NAMES.DIALOG_USER_STATUS;
 
     userInfo.appendChild(statusIndicator);
-
     dialogHeader.appendChild(userInfo);
     this.element.appendChild(dialogHeader);
 
     const messagesContainer = document.createElement('div');
-    messagesContainer.className = 'messages-container';
-    messagesContainer.id = 'messages-container';
+    messagesContainer.className = ChatDialog.CLASS_NAMES.MESSAGES_CONTAINER;
+    messagesContainer.id = ChatDialog.CLASS_NAMES.MESSAGES_CONTAINER;
 
     messagesContainer.addEventListener('scroll', () => this.handleScroll());
     messagesContainer.addEventListener('click', () => this.handleClick());
@@ -50,22 +74,22 @@ export class ChatDialog {
     this.element.appendChild(messagesContainer);
 
     const inputContainer = document.createElement('div');
-    inputContainer.className = 'message-input-container';
+    inputContainer.className = ChatDialog.CLASS_NAMES.MESSAGE_INPUT_CONTAINER;
 
     const messageInput = document.createElement('input');
     messageInput.type = 'text';
-    messageInput.placeholder = 'Ваше сообщение...';
-    messageInput.className = 'message-input';
-    messageInput.id = 'message-input';
+    messageInput.placeholder = ChatDialog.TEXT.YOUR_MESSAGE;
+    messageInput.className = ChatDialog.CLASS_NAMES.MESSAGE_INPUT;
+    messageInput.id = ChatDialog.CLASS_NAMES.MESSAGE_INPUT;
     messageInput.disabled = !this.selectedUser;
 
     const sendButton = document.createElement('button');
-    sendButton.textContent = 'Отправить';
-    sendButton.className = 'send-button';
-    sendButton.id = 'send-button';
+    sendButton.textContent = ChatDialog.TEXT.SEND;
+    sendButton.className = ChatDialog.CLASS_NAMES.SEND_BUTTON;
+    sendButton.id = ChatDialog.CLASS_NAMES.SEND_BUTTON;
     sendButton.disabled = !this.selectedUser;
 
-    messageInput.addEventListener('keypress', (event) => {
+    messageInput.addEventListener('keypress', (event: KeyboardEvent) => {
       if (event.key === 'Enter' && !sendButton.disabled) {
         this.sendMessage();
       }
@@ -95,16 +119,16 @@ export class ChatDialog {
     this.messageItems.clear();
     this.hasUnreadDivider = false;
     this.lastReadIndex = -1;
-    
-    const messageInput = document.getElementById('message-input') as HTMLInputElement;
-    const sendButton = document.getElementById('send-button') as HTMLButtonElement;
-    
+
+    const messageInput = document.getElementById(ChatDialog.CLASS_NAMES.MESSAGE_INPUT) as HTMLInputElement;
+    const sendButton = document.getElementById(ChatDialog.CLASS_NAMES.SEND_BUTTON) as HTMLButtonElement;
+
     if (messageInput && sendButton) {
       messageInput.disabled = !userLogin;
       sendButton.disabled = !userLogin;
       messageInput.value = '';
     }
-    
+
     this.updateDialogInfo(userLogin, isOnline);
     this.renderMessages();
   }
@@ -112,7 +136,7 @@ export class ChatDialog {
   setMessages(messages: Message[]): void {
     this.messages = messages.sort((a, b) => a.datetime - b.datetime);
     this.messageItems.clear();
-    
+
     const lastReadIndex = this.findLastReadIndex();
     if (lastReadIndex !== -1 && lastReadIndex < this.messages.length - 1) {
       this.hasUnreadDivider = true;
@@ -121,18 +145,18 @@ export class ChatDialog {
       this.hasUnreadDivider = false;
       this.lastReadIndex = -1;
     }
-    
+
     this.renderMessages();
   }
 
   addMessage(message: Message): void {
     this.messages.push(message);
     this.messageItems.delete(message.id);
-    
+
     if (message.to === this.currentUser && !message.status.isReaded) {
       this.hasUnreadDivider = true;
     }
-    
+
     this.renderMessages();
     this.scrollToBottom();
   }
@@ -142,7 +166,7 @@ export class ChatDialog {
     if (messageItem) {
       messageItem.updateStatus(isDelivered, isReaded);
     }
-    
+
     if (isReaded && this.hasUnreadDivider) {
       const messageIndex = this.messages.findIndex(msg => msg.id === messageId);
       if (messageIndex > this.lastReadIndex) {
@@ -171,48 +195,48 @@ export class ChatDialog {
   }
 
   private updateDialogInfo(userLogin?: string, isOnline?: boolean): void {
-    const userInfo = document.getElementById('dialog-user-info');
-    const statusIndicator = document.getElementById('dialog-user-status');
-    
+    const userInfo = document.getElementById(ChatDialog.CLASS_NAMES.DIALOG_USER_INFO);
+    const statusIndicator = document.getElementById(ChatDialog.CLASS_NAMES.DIALOG_USER_STATUS);
+
     if (!userInfo || !statusIndicator) return;
-    
+
     if (userLogin) {
       statusIndicator.textContent = userLogin;
-      statusIndicator.className = `dialog-user-status ${isOnline ? 'online' : 'offline'}`;
-      statusIndicator.title = isOnline ? 'В сети' : 'Не в сети';
+      statusIndicator.className = `${ChatDialog.CLASS_NAMES.DIALOG_USER_STATUS} ${isOnline ? ChatDialog.CLASS_NAMES.ONLINE : ChatDialog.CLASS_NAMES.OFFLINE}`;
+      statusIndicator.title = isOnline ? ChatDialog.TEXT.ONLINE : ChatDialog.TEXT.OFFLINE;
     } else {
-      statusIndicator.textContent = 'Выберите пользователя для отправки сообщения...';
-      statusIndicator.className = 'dialog-user-status';
+      statusIndicator.textContent = ChatDialog.TEXT.SELECT_USER;
+      statusIndicator.className = ChatDialog.CLASS_NAMES.DIALOG_USER_STATUS;
     }
   }
 
   private renderMessages(): void {
-    const messagesContainer = document.getElementById('messages-container');
+    const messagesContainer = document.getElementById(ChatDialog.CLASS_NAMES.MESSAGES_CONTAINER);
     if (!messagesContainer) return;
 
     messagesContainer.innerHTML = '';
 
     if (this.messages.length === 0) {
       const emptyMessage = document.createElement('div');
-      emptyMessage.className = 'empty-dialog-message';
-      
+      emptyMessage.className = ChatDialog.CLASS_NAMES.EMPTY_DIALOG_MESSAGE;
+
       if (this.selectedUser) {
-        emptyMessage.textContent = 'Это начало диалога';
+        emptyMessage.textContent = ChatDialog.TEXT.START_OF_DIALOG;
       } else {
-        emptyMessage.textContent = 'Выберите пользователя для отправки сообщения...';
+        emptyMessage.textContent = ChatDialog.TEXT.SELECT_USER;
       }
-      
+
       messagesContainer.appendChild(emptyMessage);
       return;
     }
 
     this.messages.forEach((message, index) => {
       const isCurrentUser = message.from === this.currentUser;
-      
+
       if (this.hasUnreadDivider && index === this.lastReadIndex + 1) {
         this.unreadDividerElement = document.createElement('div');
-        this.unreadDividerElement.className = 'unread-divider';
-        this.unreadDividerElement.textContent = 'Новые сообщения';
+        this.unreadDividerElement.className = ChatDialog.CLASS_NAMES.UNREAD_DIVIDER;
+        this.unreadDividerElement.textContent = ChatDialog.TEXT.NEW_MESSAGES;
         messagesContainer.appendChild(this.unreadDividerElement);
       }
 
@@ -222,14 +246,14 @@ export class ChatDialog {
         isCurrentUser ? this.onDeleteMessage : undefined,
         isCurrentUser ? this.onEditMessage : undefined
       );
-      
+
       const messageElement = messageItem.render();
       this.messageItems.set(message.id, messageItem);
-      
+
       if (message.to === this.currentUser && !message.status.isReaded) {
         this.onMarkAsRead(message.id);
       }
-      
+
       messagesContainer.appendChild(messageElement);
     });
 
@@ -237,16 +261,22 @@ export class ChatDialog {
   }
 
   private sendMessage(): void {
-    const messageInput = document.getElementById('message-input') as HTMLInputElement;
-    if (!messageInput || !messageInput.value.trim()) return;
+    const messageInput = document.getElementById(ChatDialog.CLASS_NAMES.MESSAGE_INPUT) as HTMLInputElement;
+    if (!messageInput) return;
 
     const text = messageInput.value.trim();
+
+    if (!text) {
+      console.warn('Попытка отправить пустое сообщение');
+      return;
+    }
+
     this.onSendMessage(text);
     messageInput.value = '';
   }
 
   private scrollToBottom(): void {
-    const messagesContainer = document.getElementById('messages-container');
+    const messagesContainer = document.getElementById(ChatDialog.CLASS_NAMES.MESSAGES_CONTAINER);
     if (messagesContainer) {
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
@@ -254,11 +284,11 @@ export class ChatDialog {
 
   private handleScroll(): void {
     if (this.hasUnreadDivider && this.unreadDividerElement) {
-      const container = document.getElementById('messages-container');
+      const container = document.getElementById(ChatDialog.CLASS_NAMES.MESSAGES_CONTAINER);
       if (container) {
         const dividerRect = this.unreadDividerElement.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
-        
+
         if (dividerRect.top > containerRect.top) {
           this.removeUnreadDivider();
         }
@@ -290,10 +320,10 @@ export class ChatDialog {
   }
 
   private checkUnreadDivider(): void {
-    const hasUnreadMessages = this.messages.some((msg, index) => 
+    const hasUnreadMessages = this.messages.some((msg, index) =>
       index > this.lastReadIndex && !msg.status.isReaded
     );
-    
+
     if (!hasUnreadMessages && this.hasUnreadDivider) {
       this.removeUnreadDivider();
     }

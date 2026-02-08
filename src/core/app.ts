@@ -4,7 +4,7 @@ import { WebSocketClient } from '../api/websocket-client';
 import { AuthPage } from '../components/auth/AuthPage';
 import { MainPage } from '../components/main/MainPage';
 import { AboutPage } from '../components/about/AboutPage';
-import { User, Message, ServerResponse } from '../api/types';
+import { WebSocketEvent, Message } from '../api/types';
 
 export class App {
   private router: Router;
@@ -26,15 +26,15 @@ export class App {
     this.wsClient = new WebSocketClient();
 
     this.authPage = new AuthPage(
-      (login, password) => this.handleLogin(login, password),
+      (login: string, password: string) => this.handleLogin(login, password),
       () => this.router.navigate('/about')
     );
 
     this.aboutPage = new AboutPage(() => {
       if (this.stateManager.getState().isAuthenticated) {
-        this.router.navigate('/main');
-      } else {
         this.router.navigate('/');
+      } else {
+        this.router.navigate('/login');
       }
     });
 
@@ -47,19 +47,19 @@ export class App {
   }
 
   private setupRouter(): void {
-    this.router.addRoute('/', () => {
+    this.router.addRoute('/login', () => {
       const state = this.stateManager.getState();
       if (state.isAuthenticated) {
-        this.router.navigate('/main');
+        this.router.navigate('/');
       } else {
         this.showAuthPage();
       }
     });
 
-    this.router.addRoute('/main', () => {
+    this.router.addRoute('/', () => {
       const state = this.stateManager.getState();
       if (!state.isAuthenticated) {
-        this.router.navigate('/');
+        this.router.navigate('/login');
       } else {
         this.showMainPage();
       }
@@ -68,111 +68,117 @@ export class App {
     this.router.addRoute('/about', () => {
       this.showAboutPage();
     });
+
+    this.router.addRoute('', () => {
+      this.router.navigate('/login');
+    });
   }
 
   private setupWebSocket(): void {
-    const wsUrl = process.env.NODE_ENV === 'production' ? 'wss://fun-chat-server.onrender.com' : 'ws://localhost:4000';
+    const wsUrl = process.env.NODE_ENV === 'production'
+      ? 'wss://fun-chat-server.onrender.com'
+      : 'ws://localhost:4000';
 
     this.wsClient.connect(wsUrl);
 
-    this.wsClient.onEvent('connected', () => {
-      console.log('WebSocket: Connected to server');
+    this.wsClient.onEvent(WebSocketEvent.CONNECTED, () => {
+      console.log('WebSocket connected');
     });
 
-    this.wsClient.onEvent('disconnected', () => {
-      console.log('WebSocket: Disconnected from server');
+    this.wsClient.onEvent(WebSocketEvent.DISCONNECTED, () => {
+      console.log('WebSocket disconnected');
     });
 
-    this.wsClient.onEvent('error', (error) => {
+    this.wsClient.onEvent(WebSocketEvent.ERROR, (error) => {
       console.error('WebSocket error:', error);
     });
 
-    this.wsClient.onEvent('USER_LOGIN', (data: any) => {
-      console.log('WebSocket: USER_LOGIN received');
-      const response = data as { user: User };
-      if (response.user.isLogined) {
-        console.log('Login successful, navigating to /main');
-        this.stateManager.setCurrentUser(response.user.login);
+    this.wsClient.onEvent(WebSocketEvent.USER_LOGIN, (data: any) => {
+      if (data?.user?.isLogined) {
+        this.stateManager.setCurrentUser(data.user.login);
         this.stateManager.setAuthenticated(true);
         this.requestActiveUsers();
-        this.router.navigate('/main');
+        this.router.navigate('/');
       }
     });
 
-    this.wsClient.onEvent('ERROR', (data: any) => {
-      const error = data as { error: string };
+    this.wsClient.onEvent(WebSocketEvent.ERROR_RESPONSE, (data: any) => {
       if (this.currentPage === this.authPage.render()) {
-        this.authPage.showError(error.error);
+        this.authPage.showError(data?.error || 'Unknown error');
       }
     });
 
-    this.wsClient.onEvent('USER_EXTERNAL_LOGIN', (data: any) => {
-      const response = data as { user: User };
-      this.updateUserStatus(response.user.login, true);
+    this.wsClient.onEvent(WebSocketEvent.USER_EXTERNAL_LOGIN, (data: any) => {
+      if (data?.user?.login) {
+        this.updateUserStatus(data.user.login, true);
+      }
     });
 
-    this.wsClient.onEvent('USER_EXTERNAL_LOGOUT', (data: any) => {
-      const response = data as { user: User };
-      this.updateUserStatus(response.user.login, false);
+    this.wsClient.onEvent(WebSocketEvent.USER_EXTERNAL_LOGOUT, (data: any) => {
+      if (data?.user?.login) {
+        this.updateUserStatus(data.user.login, false);
+      }
     });
 
-    this.wsClient.onEvent('USER_ACTIVE', (data: any) => {
-      const response = data as { users: User[] };
-      this.stateManager.setUsers(response.users);
+    this.wsClient.onEvent(WebSocketEvent.USER_ACTIVE, (data: any) => {
+      if (data?.users) {
+        this.stateManager.setUsers(data.users);
+      }
     });
 
-    this.wsClient.onEvent('MSG_SEND', (data: any) => {
-      const response = data as { message: Message };
-      this.handleIncomingMessage(response.message);
+    this.wsClient.onEvent(WebSocketEvent.MSG_SEND, (data: any) => {
+      if (data?.message) {
+        this.handleIncomingMessage(data.message);
+      }
     });
 
-    this.wsClient.onEvent('MSG_DELIVER', (data: any) => {
-      const response = data as { message: { id: string, status: { isDelivered: boolean } } };
-      this.stateManager.updateMessageStatus(response.message.id, true, false);
+    this.wsClient.onEvent(WebSocketEvent.MSG_DELIVER, (data: any) => {
+      if (data?.message?.id) {
+        this.stateManager.updateMessageStatus(data.message.id, true, false);
+      }
     });
 
-    this.wsClient.onEvent('MSG_READ', (data: any) => {
-      const response = data as { message: { id: string, status: { isReaded: boolean } } };
-      this.stateManager.updateMessageStatus(response.message.id, true, true);
+    this.wsClient.onEvent(WebSocketEvent.MSG_READ, (data: any) => {
+      if (data?.message?.id) {
+        this.stateManager.updateMessageStatus(data.message.id, true, true);
+      }
     });
 
-    this.wsClient.onEvent('MSG_EDIT', (data: any) => {
-      const response = data as { message: { id: string, text: string, status: { isEdited: boolean } } };
-      this.stateManager.updateMessageText(response.message.id, response.message.text);
+    this.wsClient.onEvent(WebSocketEvent.MSG_EDIT, (data: any) => {
+      if (data?.message?.id && data?.message?.text) {
+        this.stateManager.updateMessageText(data.message.id, data.message.text);
+      }
     });
 
-    this.wsClient.onEvent('MSG_DELETE', (data: any) => {
-      const response = data as { message: { id: string, status: { isDeleted: boolean } } };
-      this.stateManager.deleteMessage(response.message.id);
+    this.wsClient.onEvent(WebSocketEvent.MSG_DELETE, (data: any) => {
+      if (data?.message?.id) {
+        this.stateManager.deleteMessage(data.message.id);
+      }
     });
   }
 
   private showAuthPage(): void {
-    console.log('Showing auth page');
     this.currentPage = this.authPage.render();
     this.appContainer.innerHTML = '';
     this.appContainer.appendChild(this.currentPage);
   }
 
   private showMainPage(): void {
-    console.log('Showing main page');
     const state = this.stateManager.getState();
 
     if (!this.mainPage) {
-      console.log('Creating new MainPage');
       this.mainPage = new MainPage(
         state.currentUser!,
         () => this.handleLogout(),
         () => this.router.navigate('/about'),
-        (to, text) => this.sendMessage(to, text),
-        (messageId) => this.deleteMessage(messageId),
-        (messageId, newText) => this.editMessage(messageId, newText),
-        (messageId) => this.markAsRead(messageId),
-        (userLogin) => this.requestMessages(userLogin),
+        (to: string, text: string) => this.sendMessage(to, text),
+        (messageId: string) => this.deleteMessage(messageId),
+        (messageId: string, newText: string) => this.editMessage(messageId, newText),
+        (messageId: string) => this.markAsRead(messageId),
+        (userLogin: string) => this.requestMessages(userLogin),
         this.stateManager
       );
     } else {
-      console.log('Updating existing MainPage');
       this.mainPage.updateUserName(state.currentUser!);
     }
 
@@ -182,7 +188,6 @@ export class App {
   }
 
   private showAboutPage(): void {
-    console.log('Showing about page');
     this.currentPage = this.aboutPage.render();
     this.appContainer.innerHTML = '';
     this.appContainer.appendChild(this.currentPage);
@@ -191,18 +196,10 @@ export class App {
   private handleLogin(login: string, password: string): void {
     const requestId = this.generateRequestId();
 
-    this.wsClient.onMessage(requestId, (response: ServerResponse) => {
-      if (response.type === 'ERROR') {
-        this.authPage.showError((response.payload as any).error);
-      }
-    });
-
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'USER_LOGIN',
-      payload: {
-        user: { login, password }
-      }
+      type: WebSocketEvent.USER_LOGIN,
+      payload: { user: { login, password } }
     });
   }
 
@@ -212,23 +209,21 @@ export class App {
 
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'USER_LOGOUT',
-      payload: {
-        user: { login: state.currentUser!, password: '' }
-      }
+      type: WebSocketEvent.USER_LOGOUT,
+      payload: { user: { login: state.currentUser! } }
     });
 
     this.stateManager.setAuthenticated(false);
     this.stateManager.setCurrentUser(null);
     this.mainPage = null;
-    this.router.navigate('/');
+    this.router.navigate('/login');
   }
 
   private requestActiveUsers(): void {
     const requestId = this.generateRequestId();
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'USER_ACTIVE',
+      type: WebSocketEvent.USER_ACTIVE,
       payload: null
     });
   }
@@ -239,10 +234,8 @@ export class App {
     const requestId = this.generateRequestId();
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'MSG_SEND',
-      payload: {
-        message: { to, text }
-      }
+      type: WebSocketEvent.MSG_SEND,
+      payload: { message: { to, text } }
     });
   }
 
@@ -250,10 +243,8 @@ export class App {
     const requestId = this.generateRequestId();
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'MSG_DELETE',
-      payload: {
-        message: { id: messageId }
-      }
+      type: WebSocketEvent.MSG_DELETE,
+      payload: { message: { id: messageId } }
     });
   }
 
@@ -263,10 +254,8 @@ export class App {
     const requestId = this.generateRequestId();
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'MSG_EDIT',
-      payload: {
-        message: { id: messageId, text: newText }
-      }
+      type: WebSocketEvent.MSG_EDIT,
+      payload: { message: { id: messageId, text: newText } }
     });
   }
 
@@ -274,46 +263,38 @@ export class App {
     const requestId = this.generateRequestId();
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'MSG_READ',
-      payload: {
-        message: { id: messageId }
-      }
+      type: WebSocketEvent.MSG_READ,
+      payload: { message: { id: messageId } }
     });
   }
 
   private requestMessages(userLogin: string): void {
     const requestId = this.generateRequestId();
 
-    this.wsClient.onMessage(requestId, (response: ServerResponse) => {
-      if (response.type === 'MSG_FROM_USER') {
-        const messages = (response.payload as any).messages as Message[];
-        this.stateManager.setMessages(messages);
+    this.wsClient.onMessage(requestId, (response: any) => {
+      if (response.type === WebSocketEvent.MSG_FROM_USER && response.payload?.messages) {
+        this.stateManager.setMessages(response.payload.messages);
       }
     });
 
     this.wsClient.sendRequest({
       id: requestId,
-      type: 'MSG_FROM_USER',
-      payload: {
-        user: { login: userLogin }
-      }
+      type: WebSocketEvent.MSG_FROM_USER,
+      payload: { user: { login: userLogin } }
     });
 
     const countRequestId = this.generateRequestId();
 
-    this.wsClient.onMessage(countRequestId, (response: ServerResponse) => {
-      if (response.type === 'MSG_COUNT_NOT_READED_FROM_USER') {
-        const count = (response.payload as any).count as number;
-        this.stateManager.setUnreadCount(userLogin, count);
+    this.wsClient.onMessage(countRequestId, (response: any) => {
+      if (response.type === WebSocketEvent.MSG_COUNT_NOT_READED_FROM_USER && response.payload?.count !== undefined) {
+        this.stateManager.setUnreadCount(userLogin, response.payload.count);
       }
     });
 
     this.wsClient.sendRequest({
       id: countRequestId,
-      type: 'MSG_COUNT_NOT_READED_FROM_USER',
-      payload: {
-        user: { login: userLogin }
-      }
+      type: WebSocketEvent.MSG_COUNT_NOT_READED_FROM_USER,
+      payload: { user: { login: userLogin } }
     });
   }
 

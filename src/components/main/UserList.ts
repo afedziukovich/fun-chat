@@ -35,8 +35,6 @@ export class UserList {
 
     const usersContainer = document.createElement('div');
     usersContainer.className = 'users-container';
-    usersContainer.id = 'users-container';
-
     this.element.appendChild(usersContainer);
 
     this.renderUsers();
@@ -60,21 +58,21 @@ export class UserList {
   }
 
   private filterUsers(searchTerm: string): void {
-    const filteredUsers = this.users.filter(user => 
+    const filteredUsers = this.users.filter(user =>
       user.login.toLowerCase().includes(searchTerm.toLowerCase())
     );
     this.renderFilteredUsers(filteredUsers);
   }
 
   private renderUsers(): void {
-    const filteredUsers = this.users.filter(user => 
+    const filteredUsers = this.users.filter(user =>
       user.login !== this.currentUser
     );
     this.renderFilteredUsers(filteredUsers);
   }
 
   private renderFilteredUsers(users: User[]): void {
-    const usersContainer = document.getElementById('users-container');
+    const usersContainer = this.element.querySelector('.users-container');
     if (!usersContainer) return;
 
     usersContainer.innerHTML = '';
@@ -104,7 +102,7 @@ export class UserList {
 
     const statusIndicator = document.createElement('span');
     statusIndicator.className = 'user-status ' + (user.isLogined ? 'online' : 'offline');
-    (statusIndicator as HTMLElement).title = user.isLogined ? 'В сети' : 'Не в сети';
+    statusIndicator.setAttribute('title', user.isLogined ? 'В сети' : 'Не в сети');
 
     const unreadBadge = document.createElement('span');
     unreadBadge.className = 'user-unread-badge';
@@ -128,12 +126,12 @@ export class UserList {
   }
 
   private updateUserItem(userLogin: string): void {
-    const userElement = this.element.querySelector('.user-item[data-login="' + userLogin + '"]');
+    const userElement = this.element.querySelector(`.user-item[data-login="${userLogin}"]`);
     if (!userElement) return;
 
     const unreadBadge = userElement.querySelector('.user-unread-badge') as HTMLElement;
     const unreadCount = this.unreadCounts.get(userLogin) || 0;
-    
+
     if (unreadBadge) {
       if (unreadCount > 0) {
         unreadBadge.textContent = unreadCount.toString();
@@ -148,12 +146,12 @@ export class UserList {
     const user = this.users.find(u => u.login === userLogin);
     if (user) {
       user.isLogined = isLogined;
-      const userElement = this.element.querySelector('.user-item[data-login="' + userLogin + '"]');
+      const userElement = this.element.querySelector(`.user-item[data-login="${userLogin}"]`);
       if (userElement) {
         const statusIndicator = userElement.querySelector('.user-status');
         if (statusIndicator) {
           statusIndicator.className = 'user-status ' + (isLogined ? 'online' : 'offline');
-          (statusIndicator as HTMLElement).title = isLogined ? 'В сети' : 'Не в сети';
+          statusIndicator.setAttribute('title', isLogined ? 'В сети' : 'Не в сети');
         }
       }
     }

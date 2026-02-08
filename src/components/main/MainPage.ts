@@ -67,7 +67,7 @@ export class MainPage {
 
       if (state.userStatuses) {
         Object.entries(state.userStatuses).forEach(([userLogin, status]) => {
-          this.updateUserStatus(userLogin, (status as { isOnline: boolean }).isOnline);
+          this.updateUserStatus(userLogin, (status as any).isOnline);
         });
       }
 
