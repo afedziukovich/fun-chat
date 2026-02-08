@@ -194,13 +194,14 @@ export class App {
   }
 
   private handleLogin(login: string, password: string): void {
-    const requestId = this.generateRequestId();
-
-    this.wsClient.sendRequest({
-      id: requestId,
-      type: WebSocketEvent.USER_LOGIN,
-      payload: { user: { login, password } }
-    });
+    setTimeout(() => {
+      const requestId = this.generateRequestId();
+      this.wsClient.sendRequest({
+        id: requestId,
+        type: WebSocketEvent.USER_LOGIN,
+        payload: { user: { login, password } }
+      });
+    }, 1500);
   }
 
   private handleLogout(): void {
